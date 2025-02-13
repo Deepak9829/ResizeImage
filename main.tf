@@ -115,7 +115,7 @@ resource "aws_iam_role_policy_attachment" "lambda_ecr_full_access" {
 # Lambda function
 resource "aws_lambda_function" "image_resize" {
   package_type    = "Image"
-  image_uri       = "194428989522.dkr.ecr.ap-southeast-1.amazonaws.com/resizeimage:v1.0.3"
+  image_uri       = "194428989522.dkr.ecr.ap-southeast-1.amazonaws.com/resizeimage:v1.0.4"
   function_name   = "image_resize_function"
   role            = aws_iam_role.lambda_role.arn
   timeout         = 300
