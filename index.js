@@ -3,19 +3,44 @@ const sharp = require('sharp');
 
 const s3Client = new S3Client({});
 
+function getBase64Data(base64String) {
+    // Remove data URI prefix if present (e.g., "data:image/jpeg;base64,...")
+    const matches = base64String.match(/^data:image\/(png|jpeg|jpg);base64,(.+)$/);
+    return matches ? matches[2] : base64String;
+}
+
 exports.handler = async (event) => {
     try {
-        // Parse the incoming request
+        // Parse request body
         const body = JSON.parse(event.body);
-        const imageData = Buffer.from(body.image, 'base64');
-        const fileName = body.fileName || `image-${Date.now()}.jpg`;
+        if (!body.image) {
+            throw new Error("Missing 'image' in request body");
+        }
 
-        // Upload original image
+        const base64Data = getBase64Data(body.image);
+        const imageData = Buffer.from(base64Data, 'base64');
+
+        // Validate image format
+        const metadata = await sharp(imageData).metadata();
+        console.log('Image metadata:', metadata);
+        if (!metadata.format) {
+            throw new Error("Unsupported image format");
+        }
+
+        const fileExtension = metadata.format; // e.g., "jpeg", "png"
+        const fileName = body.fileName || `image-${Date.now()}.${fileExtension}`;
+
+        const bucketName = process.env.BUCKET_NAME;
+        if (!bucketName) {
+            throw new Error("Missing environment variable: BUCKET_NAME");
+        }
+
+        // Upload original image to S3
         await s3Client.send(new PutObjectCommand({
-            Bucket: process.env.BUCKET_NAME,
+            Bucket: bucketName,
             Key: `originals/${fileName}`,
             Body: imageData,
-            ContentType: 'image/jpeg'
+            ContentType: `image/${fileExtension}`
         }));
 
         // Resize image
@@ -26,12 +51,12 @@ exports.handler = async (event) => {
             })
             .toBuffer();
 
-        // Upload resized image
+        // Upload resized image to S3
         await s3Client.send(new PutObjectCommand({
-            Bucket: process.env.BUCKET_NAME,
+            Bucket: bucketName,
             Key: `resized/${fileName}`,
             Body: resizedImage,
-            ContentType: 'image/jpeg'
+            ContentType: `image/${fileExtension}`
         }));
 
         return {

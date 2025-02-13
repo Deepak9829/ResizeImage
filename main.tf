@@ -77,27 +77,51 @@ resource "aws_iam_role_policy" "lambda_policy" {
   })
 }
 
-resource "aws_lambda_layer_version" "sharp" {
-  filename         = "sharp-layer.zip"
-  layer_name       = "sharp"
-  description      = "Sharp image processing library"
-  compatible_runtimes = ["nodejs18.x"]
+resource "aws_iam_policy" "lambda_ecr_full_access" {
+  name        = "LambdaECRFullAccess"
+  description = "Grants full access to ECR for Lambda functions"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = [
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:ListImages",
+          "ecr:DescribeRepositories",
+          "ecr:GetAuthorizationToken",
+          "ecr:CreateRepository",
+          "ecr:DeleteRepository",
+          "ecr:PutImage",
+          "ecr:DeleteImage",
+          "ecr:ListTagsForResource",
+          "ecr:BatchDeleteImage",
+          "ecr:SetRepositoryPolicy",
+          "ecr:DeleteRepositoryPolicy"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
 
-  compatible_architectures = ["x86_64"]
+resource "aws_iam_role_policy_attachment" "lambda_ecr_full_access" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.lambda_ecr_full_access.arn
 }
 
 # Lambda function
 resource "aws_lambda_function" "image_resize" {
-  package_type = "Image"
-  image_uri    = "deepakdocker25/resizeimage:v1.0.0"
-  function_name    = "image_resize_function"
+  package_type    = "Image"
+  image_uri       = "194428989522.dkr.ecr.ap-southeast-1.amazonaws.com/resizeimage:v1.0.1"
+  function_name   = "image_resize_function"
   role            = aws_iam_role.lambda_role.arn
-  handler         = "index.handler"
-  runtime         = "nodejs18.x"
-  timeout         = 30
+  timeout         = 300
   memory_size     = 512
+  architectures   = ["arm64"]  # ✅ Explicitly set ARM architecture
 
-  layers = [aws_lambda_layer_version.sharp.arn]
 
   environment {
     variables = {
