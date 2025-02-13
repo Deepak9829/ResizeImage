@@ -1,10 +1,13 @@
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const sharp = require('sharp');
 
-const s3Client = new S3Client({});
+// Initialize the S3 client (You can add your region if needed)
+const s3Client = new S3Client({
+    region: 'ap-southeast-1'  // Replace with your AWS region
+});
 
+// Helper function to extract base64 string from incoming image data
 function getBase64Data(base64String) {
-    // Remove data URI prefix if present (e.g., "data:image/jpeg;base64,...")
     const matches = base64String.match(/^data:image\/(png|jpeg|jpg);base64,(.+)$/);
     return matches ? matches[2] : base64String;
 }
@@ -20,14 +23,13 @@ exports.handler = async (event) => {
         const base64Data = getBase64Data(body.image);
         const imageData = Buffer.from(base64Data, 'base64');
 
-        // Validate image format
+        // Validate image format using sharp
         const metadata = await sharp(imageData).metadata();
-        console.log('Image metadata:', metadata);
         if (!metadata.format) {
             throw new Error("Unsupported image format");
         }
 
-        const fileExtension = metadata.format; // e.g., "jpeg", "png"
+        const fileExtension = metadata.format;  // e.g., "jpeg", "png"
         const fileName = body.fileName || `image-${Date.now()}.${fileExtension}`;
 
         const bucketName = process.env.BUCKET_NAME;
@@ -59,11 +61,12 @@ exports.handler = async (event) => {
             ContentType: `image/${fileExtension}`
         }));
 
+        // Return success response
         return {
             statusCode: 200,
             headers: {
                 "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
+                "Access-Control-Allow-Origin": "*"  // Enable CORS
             },
             body: JSON.stringify({
                 message: 'Image processed successfully',
@@ -73,6 +76,8 @@ exports.handler = async (event) => {
         };
     } catch (error) {
         console.error('Error:', error);
+
+        // Return error response
         return {
             statusCode: 500,
             headers: {
