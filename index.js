@@ -8,8 +8,12 @@ const s3Client = new S3Client({
 
 // Helper function to extract base64 string from incoming image data
 function getBase64Data(base64String) {
+    // Remove data URI prefix if present (e.g., "data:image/jpeg;base64,...")
     const matches = base64String.match(/^data:image\/(png|jpeg|jpg);base64,(.+)$/);
-    return matches ? matches[2] : base64String;
+    if (matches) {
+        return matches[2]; // Extract base64 data without the prefix
+    }
+    return base64String; // Return the base64 string as-is if it's already without prefix
 }
 
 exports.handler = async (event) => {
@@ -20,11 +24,16 @@ exports.handler = async (event) => {
             throw new Error("Missing 'image' in request body");
         }
 
+        // Extract base64 image data (handle both data URI and plain base64)
         const base64Data = getBase64Data(body.image);
         const imageData = Buffer.from(base64Data, 'base64');
 
+        console.log('Received image data length:', imageData.length);  // Log the data size for debugging
+
         // Validate image format using sharp
         const metadata = await sharp(imageData).metadata();
+        console.log('Image metadata:', metadata);  // Log metadata for further debugging
+
         if (!metadata.format) {
             throw new Error("Unsupported image format");
         }
